@@ -1,635 +1,1004 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import {
-  RotateCw,
-  Download,
-  ShieldCheck,
-  QrCode,
-  AlertTriangle,
-  HeartPulse,
-  Cpu,
-  FileText,
-  Sparkles,
   PawPrint,
-  CheckCircle2,
+  Download,
+  PlusCircle,
+  Upload,
   Calendar,
   Scale,
-  BadgeAlert,
-  Printer
+  User,
+  Heart,
+  AlertTriangle,
+  Phone,
+  QrCode,
+  Sparkles,
+  X,
+  Check,
+  Cat,
+  Dog,
+  ShieldCheck,
+  FileText,
+  Edit3,
+  Trash2,
+  ChevronRight,
+  Plus,
+  Layers
 } from 'lucide-react';
 
-/**
- * PassportCard Component
- * - 3D Flip Card: Front (Identification) & Back (Medical & Rescue)
- * - Tông màu Pastel Sky Blue (#66CCFF) và Trắng (#FFFFFF)
- * - Xuất file PNG / PDF chất lượng cao bằng html2canvas & jspdf
- */
-const PassportCard = ({
-  pet = {
-    petCode: 'VN-PAW-882341',
-    name: 'Bơ (Avocado)',
-    species: 'Chó (Canine)',
-    breed: 'Corgi Pembroke Welsh',
-    sex: 'Đực (Male)',
-    birthday: '15/06/2022',
-    weight: '11.5 kg',
-    avatarUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=600&q=80',
-    bio: 'Bé rất thân thiện, thích ăn táo và thích được vuốt cằm. Rất quấn người.',
-    microchip: '981098108427192',
-    issueDate: '01/01/2024',
-    expiryDate: 'Vô thời hạn (Lifetime)',
-    owner: {
-      fullName: 'Nguyễn Văn Hào',
-      phone: '0901234567',
-      address: 'Quận 7, TP. Hồ Chí Minh'
-    },
+// Dữ liệu thú cưng mặc định ban đầu
+const DEFAULT_PETS = [
+  {
+    id: 'pet_01',
+    name: 'Mochi',
+    petCode: 'VN-MOCHI-001',
+    species: 'Cat',
+    breed: 'British Shorthair',
+    sex: 'Female',
+    birthday: '12 May 2024',
+    weight: '3.8 kg',
+    quote: 'Small cat,\nBig personality.',
+    ownerName: 'Scarlett Nguyen',
+    ownerPhone: '0901234567',
+    avatarUrl: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=600&q=80',
     emergency: {
-      allergies: ['Dị ứng tôm/cua (Hải sản)', 'Dị ứng kháng sinh Penicillin'],
-      medications: ['Bổ sung men tiêu hóa định kỳ', 'Thuốc xịt dị ứng ngoài da'],
-      specialNote: 'Bé sợ sấm sét và tiếng pháo hoa lớn. Nhát nước.'
-    },
-    qrCode: {
-      qrUrl: 'https://petpassport.vn/p/VN-PAW-882341',
-      qrImageUrl: ''
+      allergy: 'Seafood',
+      medication: 'None',
+      specialNote: 'Shy but affectionate'
+    }
+  },
+  {
+    id: 'pet_02',
+    name: 'Bơ (Avocado)',
+    petCode: 'VN-AVOCADO-002',
+    species: 'Dog',
+    breed: 'Corgi Pembroke Welsh',
+    sex: 'Male',
+    birthday: '15 Jun 2023',
+    weight: '11.5 kg',
+    quote: 'Always smiling,\nLoves walking in rain.',
+    ownerName: 'Scarlett Nguyen',
+    ownerPhone: '0901234567',
+    avatarUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=600&q=80',
+    emergency: {
+      allergy: 'Chicken bones',
+      medication: 'Digestive enzyme',
+      specialNote: 'Afraid of thunder & loud fireworks'
     }
   }
-}) => {
-  const [isFlipped, setIsFlipped] = useState(false);
+];
+
+const PassportCard = () => {
+  // Lấy danh sách thú cưng từ localStorage hoặc khởi tạo danh sách mặc định
+  const [pets, setPets] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pet_passport_list');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Lỗi đọc localStorage:', e);
+    }
+    return DEFAULT_PETS;
+  });
+
+  // ID của thú cưng đang được chọn để hiển thị hộ chiếu
+  const [selectedPetId, setSelectedPetId] = useState(() => {
+    return pets[0]?.id || '';
+  });
+
+  // Tự động lưu vào localStorage khi danh sách pets thay đổi
+  useEffect(() => {
+    try {
+      localStorage.setItem('pet_passport_list', JSON.stringify(pets));
+    } catch (e) {
+      console.warn('Lỗi lưu localStorage:', e);
+    }
+  }, [pets]);
+
+  // Tìm thú cưng hiện tại đang được chọn
+  const currentPet = pets.find((p) => p.id === selectedPetId) || pets[0] || null;
+
+  // State Modal (Thêm / Sửa)
+  const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit'
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'png'
-  const [copied, setCopied] = useState(false);
 
-  // Hidden print container refs for crisp 2-face export
-  const exportContainerRef = useRef(null);
+  // Form state
+  const [formData, setFormData] = useState({
+    id: '',
+    name: '',
+    petCode: '',
+    species: 'Cat',
+    breed: '',
+    sex: 'Female',
+    birthday: '',
+    weight: '',
+    quote: '',
+    ownerName: '',
+    ownerPhone: '',
+    allergy: 'None',
+    medication: 'None',
+    specialNote: 'Friendly',
+    avatarUrl: ''
+  });
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(pet.petCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const [previewImage, setPreviewImage] = useState('');
+  const fileInputRef = useRef(null);
+  const passportBookletRef = useRef(null);
+
+  // Mở modal Thêm thú cưng mới
+  const handleOpenCreateModal = () => {
+    setModalMode('create');
+    setFormData({
+      id: `pet_${Date.now()}`,
+      name: '',
+      petCode: '',
+      species: 'Cat',
+      breed: '',
+      sex: 'Female',
+      birthday: '01 Jan 2024',
+      weight: '3.5 kg',
+      quote: 'Small cutie,\nSweet companion.',
+      ownerName: currentPet?.ownerName || 'Chủ nuôi',
+      ownerPhone: currentPet?.ownerPhone || '0901234567',
+      allergy: 'None',
+      medication: 'None',
+      specialNote: 'Friendly',
+      avatarUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=600&q=80'
+    });
+    setPreviewImage('https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=600&q=80');
+    setIsModalOpen(true);
   };
 
-  // Helper to generate MRZ lines
-  const cleanCode = (pet.petCode || 'VN-PAW-000000').replace(/[^a-zA-Z0-9]/g, '');
-  const cleanName = (pet.name || 'PET').toUpperCase().replace(/[^A-Z]/g, '');
-  const mrzLine1 = `P<VNM${cleanCode}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<`.slice(0, 36);
-  const mrzLine2 = `VN${cleanCode}9VNM2206154M9912318<<<${cleanName}<<<<<<<02`.slice(0, 36);
+  // Mở modal Chỉnh sửa thú cưng hiện tại
+  const handleOpenEditModal = () => {
+    if (!currentPet) return;
+    setModalMode('edit');
+    setFormData({
+      id: currentPet.id,
+      name: currentPet.name,
+      petCode: currentPet.petCode,
+      species: currentPet.species,
+      breed: currentPet.breed,
+      sex: currentPet.sex,
+      birthday: currentPet.birthday,
+      weight: currentPet.weight,
+      quote: currentPet.quote,
+      ownerName: currentPet.ownerName,
+      ownerPhone: currentPet.ownerPhone,
+      allergy: currentPet.emergency?.allergy || 'None',
+      medication: currentPet.emergency?.medication || 'None',
+      specialNote: currentPet.emergency?.specialNote || 'Friendly',
+      avatarUrl: currentPet.avatarUrl
+    });
+    setPreviewImage(currentPet.avatarUrl);
+    setIsModalOpen(true);
+  };
 
-  // Export using html2canvas & jsPDF
-  const handleDownload = async (type = 'pdf') => {
-    if (!exportContainerRef.current) return;
+  // Xử lý khi upload file ảnh từ máy tính
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Vui lòng chọn ảnh dung lượng dưới 5MB!');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result);
+        setFormData((prev) => ({ ...prev, avatarUrl: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Lưu thông tin khi Submit form (Thêm hoặc Cập nhật)
+  const handleSubmitPet = (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) {
+      alert('Vui lòng nhập tên thú cưng!');
+      return;
+    }
+
+    const cleanName = formData.name.trim();
+    const formattedCode =
+      formData.petCode.trim() ||
+      `VN-${cleanName.toUpperCase().replace(/\s+/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const petObject = {
+      id: modalMode === 'edit' ? formData.id : `pet_${Date.now()}`,
+      name: cleanName,
+      petCode: formattedCode,
+      species: formData.species || 'Cat',
+      breed: formData.breed || 'Chưa rõ',
+      sex: formData.sex || 'Female',
+      birthday: formData.birthday || '01 Jan 2024',
+      weight: formData.weight || '3.5 kg',
+      quote: formData.quote || 'Small cutie,\nSweet companion.',
+      ownerName: formData.ownerName || 'Chủ nuôi',
+      ownerPhone: formData.ownerPhone || '0901234567',
+      avatarUrl: previewImage || formData.avatarUrl,
+      emergency: {
+        allergy: formData.allergy || 'None',
+        medication: formData.medication || 'None',
+        specialNote: formData.specialNote || 'Friendly'
+      }
+    };
+
+    if (modalMode === 'create') {
+      setPets((prev) => [...prev, petObject]);
+      setSelectedPetId(petObject.id);
+    } else {
+      setPets((prev) =>
+        prev.map((item) => (item.id === petObject.id ? petObject : item))
+      );
+    }
+
+    setIsModalOpen(false);
+  };
+
+  // Xóa thú cưng đang chọn
+  const handleConfirmDelete = () => {
+    if (!currentPet) return;
+    const remaining = pets.filter((p) => p.id !== currentPet.id);
+    setPets(remaining);
+    if (remaining.length > 0) {
+      setSelectedPetId(remaining[0].id);
+    } else {
+      setSelectedPetId('');
+    }
+    setIsDeleteModalOpen(false);
+  };
+
+  // Tạo URL cho QR code
+  const qrTargetUrl = currentPet
+    ? `${window.location.origin}/p/${currentPet.petCode}`
+    : window.location.origin;
+
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+    qrTargetUrl
+  )}&color=1e3a5f`;
+
+  // Xuất file PDF / PNG
+  const handleExport = async (type = 'pdf') => {
+    if (!passportBookletRef.current || !currentPet) return;
     setIsExporting(true);
 
     try {
-      const container = exportContainerRef.current;
-      // Show container off-screen temporarily with visible display
-      container.style.display = 'flex';
-
-      const frontEl = container.querySelector('#export-card-front');
-      const backEl = container.querySelector('#export-card-back');
-
-      const canvasFront = await html2canvas(frontEl, {
+      const element = passportBookletRef.current;
+      const canvas = await html2canvas(element, {
         scale: 2.5,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#0F2644',
       });
-
-      const canvasBack = await html2canvas(backEl, {
-        scale: 2.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#FFFFFF',
-      });
-
-      container.style.display = 'none';
 
       if (type === 'pdf') {
-        // PDF Landscape A5 (210mm x 148mm)
         const pdf = new jsPDF({
           orientation: 'landscape',
           unit: 'mm',
           format: 'a5',
         });
-
-        const imgDataFront = canvasFront.toDataURL('image/png');
-        const imgDataBack = canvasBack.toDataURL('image/png');
-
-        // Page 1: Mặt trước
-        pdf.addImage(imgDataFront, 'PNG', 12, 10, 186, 128);
-        
-        // Page 2: Mặt sau
-        pdf.addPage('a5', 'landscape');
-        pdf.addImage(imgDataBack, 'PNG', 12, 10, 186, 128);
-
-        pdf.save(`PetPassport_${pet.petCode}.pdf`);
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 10, 8, 190, 132);
+        pdf.save(`PetPassport_${currentPet.petCode}.pdf`);
       } else {
-        // PNG export: Merge both cards onto a single combined canvas
-        const combinedCanvas = document.createElement('canvas');
-        const gap = 30;
-        combinedCanvas.width = canvasFront.width;
-        combinedCanvas.height = canvasFront.height * 2 + gap;
-
-        const ctx = combinedCanvas.getContext('2d');
-        ctx.fillStyle = '#F8FAFC';
-        ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
-        ctx.drawImage(canvasFront, 0, 0);
-        ctx.drawImage(canvasBack, 0, canvasFront.height + gap);
-
         const link = document.createElement('a');
-        link.download = `PetPassport_${pet.petCode}.png`;
-        link.href = combinedCanvas.toDataURL('image/png');
+        link.download = `PetPassport_${currentPet.petCode}.png`;
+        link.href = canvas.toDataURL('image/png');
         link.click();
       }
     } catch (err) {
-      console.error('Lỗi khi xuất thẻ hộ chiếu:', err);
-      alert('Có lỗi xảy ra trong quá trình xuất thẻ. Vui lòng thử lại!');
+      console.error('Lỗi khi xuất hộ chiếu:', err);
+      alert('Có lỗi khi xuất file. Vui lòng thử lại!');
     } finally {
-      if (exportContainerRef.current) {
-        exportContainerRef.current.style.display = 'none';
-      }
       setIsExporting(false);
     }
   };
 
-  // Fallback QR code SVG rendering if qrImageUrl is not provided
-  const rescueUrl = pet.qrCode?.qrUrl || `${window.location.origin}/p/${pet.petCode}`;
-
   return (
-    <div className="flex flex-col items-center w-full max-w-2xl mx-auto p-4 sm:p-6">
-      {/* Action Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 w-full mb-6 bg-white/90 backdrop-blur-md px-5 py-3.5 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 text-slate-700">
-          <PawPrint className="w-5 h-5 text-[#66CCFF]" />
-          <span className="font-semibold text-sm sm:text-base">Hộ Chiếu Điện Tử</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-[#E6F7FF] text-[#0284C7] font-medium border border-[#66CCFF]/30">
-            {isFlipped ? 'Mặt Sau: Y Tế & Cứu Hộ' : 'Mặt Trước: Định Danh'}
-          </span>
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-2 sm:p-6 space-y-6">
+      {/* ========================================================================= */}
+      {/* THANH QUẢN LÝ NHIỀU PET (PET SELECTOR TABS)                               */}
+      {/* ========================================================================= */}
+      <div className="w-full bg-white/95 backdrop-blur-md p-4 rounded-3xl shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#0284C7]" />
+            <h3 className="font-extrabold text-slate-800 text-sm sm:text-base">
+              Danh Sách Thú Cưng Của Bạn
+            </h3>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#E6F7FF] text-[#0284C7] font-bold">
+              {pets.length} bé
+            </span>
+          </div>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-[#0284C7] hover:bg-[#0369A1] rounded-xl shadow-xs transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm Thú Cưng Mới</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Nút Lật Thẻ 3D */}
-          <button
-            onClick={() => setIsFlipped(!isFlipped)}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-[#E6F7FF] hover:text-[#0284C7] border border-slate-200 hover:border-[#66CCFF] rounded-xl transition-all duration-200 active:scale-95 shadow-sm"
-            title="Lật sang mặt còn lại của thẻ"
-          >
-            <RotateCw className={`w-4 h-4 text-[#66CCFF] transition-transform duration-500 ${isFlipped ? 'rotate-180' : ''}`} />
-            <span>Lật thẻ</span>
-          </button>
+        {/* Danh sách các bé cuộn ngang */}
+        <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+          {pets.map((p) => {
+            const isSelected = p.id === selectedPetId;
+            return (
+              <button
+                key={p.id}
+                onClick={() => setSelectedPetId(p.id)}
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl border transition-all shrink-0 text-left ${
+                  isSelected
+                    ? 'bg-[#E6F7FF] border-[#66CCFF] shadow-sm ring-2 ring-[#66CCFF]/30'
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 opacity-80 hover:opacity-100'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-full overflow-hidden border border-white shadow-xs shrink-0">
+                  <img
+                    src={p.avatarUrl}
+                    alt={p.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <div className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
+                    {p.name}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    {p.species} • {p.petCode}
+                  </div>
+                </div>
+                {isSelected && (
+                  <div className="w-2 h-2 rounded-full bg-[#0284C7] ml-1" />
+                )}
+              </button>
+            );
+          })}
 
-          {/* Menu / Nút Tải Hộ Chiếu */}
-          <div className="relative group">
+          {/* Nút thêm nhanh ở cuối list */}
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border-2 border-dashed border-slate-300 hover:border-[#66CCFF] hover:bg-[#E6F7FF]/50 text-slate-500 hover:text-[#0284C7] transition-all shrink-0 text-xs font-bold"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm Bé Khác</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* ACTION TOOLBAR CHO BÉ ĐANG CHỌN (CHỈNH SỬA / XÓA / TẢI IN ẤN)              */}
+      {/* ========================================================================= */}
+      {currentPet && (
+        <div className="flex flex-wrap items-center justify-between gap-3 w-full bg-white/95 backdrop-blur-md px-5 py-3 rounded-2xl shadow-xs border border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-400 uppercase">Đang xem:</span>
+            <span className="font-black text-slate-900 text-sm sm:text-base">
+              {currentPet.name}
+            </span>
+            <span className="text-xs font-mono font-bold text-[#0284C7] bg-[#E6F7FF] px-2 py-0.5 rounded-lg border border-[#66CCFF]/30">
+              {currentPet.petCode}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Nút Chỉnh Sửa */}
             <button
-              onClick={() => handleDownload('pdf')}
+              onClick={handleOpenEditModal}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-[#E6F7FF] hover:text-[#0284C7] border border-slate-200 rounded-xl transition-all shadow-2xs active:scale-95"
+              title="Chỉnh sửa thông tin bé này"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-[#0284C7]" />
+              <span>Chỉnh Sửa</span>
+            </button>
+
+            {/* Nút Xóa Hộ Chiếu */}
+            <button
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all shadow-2xs active:scale-95"
+              title="Xóa hộ chiếu thú cưng này"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Xóa Bé Này</span>
+            </button>
+
+            {/* Nút Tải PDF */}
+            <button
+              onClick={() => handleExport('pdf')}
               disabled={isExporting}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-[#66CCFF] hover:bg-[#3399CC] rounded-xl transition-all duration-200 shadow-md hover:shadow-sky-soft active:scale-95 disabled:opacity-60"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[#0284C7] hover:bg-[#0369A1] rounded-xl transition-all shadow-xs active:scale-95 disabled:opacity-60"
             >
               {isExporting ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
               )}
-              <span>{isExporting ? 'Đang xuất...' : 'Tải hộ chiếu (PDF)'}</span>
+              <span>{isExporting ? 'Đang xuất...' : 'Tải PDF'}</span>
             </button>
-            
-            {/* Quick dropdown for PNG option */}
+
             <button
-              onClick={() => handleDownload('png')}
+              onClick={() => handleExport('png')}
               disabled={isExporting}
-              className="hidden sm:inline-flex ml-1.5 px-3 py-2 text-sm font-medium text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-sm"
-              title="Tải ảnh PNG 2 mặt sắc nét"
+              className="hidden sm:inline-flex px-3 py-2 text-xs font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all"
             >
               PNG
             </button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 3D Flip Card Container */}
-      <div className="w-full perspective-1000">
+      {/* ========================================================================= */}
+      {/* CUỐN SỔ HỘ CHIẾU MỞ 2 TRANG                                               */}
+      {/* ========================================================================= */}
+      {currentPet ? (
         <div
-          className={`relative w-full aspect-[1.586/1] min-h-[380px] sm:min-h-[420px] transition-transform duration-700 transform-style-3d ${
-            isFlipped ? 'rotate-y-180' : ''
-          }`}
+          ref={passportBookletRef}
+          className="w-full bg-[#162D4A] p-2.5 sm:p-5 rounded-[28px] sm:rounded-[36px] shadow-2xl border-4 border-[#0F2238] overflow-hidden"
         >
-          {/* ========================================================= */}
-          {/* MẶT TRƯỚC (IDENTIFICATION)                                */}
-          {/* ========================================================= */}
-          <div className="absolute inset-0 w-full h-full backface-hidden rounded-3xl bg-gradient-to-br from-white via-white to-[#E6F7FF]/50 border-2 border-[#66CCFF]/40 shadow-xl overflow-hidden flex flex-col justify-between p-5 sm:p-7">
-            {/* Background Decorative Guilloche / Wave Patterns */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-radial from-[#66CCFF]/15 to-transparent rounded-full -mr-20 -mt-20 pointer-events-none" />
-            <div className="absolute bottom-10 left-10 w-48 h-48 bg-radial from-[#66CCFF]/10 to-transparent rounded-full -ml-16 -mb-16 pointer-events-none" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-4 relative bg-[#EAF3FA] rounded-[20px] sm:rounded-[26px] p-4 sm:p-8 overflow-hidden">
+            {/* Đường gáy sổ ở giữa */}
+            <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-[6px] -translate-x-1/2 bg-gradient-to-r from-slate-400/30 via-slate-500/20 to-slate-400/30 shadow-inner z-20 pointer-events-none" />
 
-            {/* Header Thẻ */}
-            <div className="relative z-10 flex items-start justify-between border-b border-[#66CCFF]/20 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-[#66CCFF] to-[#BAE6FD] flex items-center justify-center shadow-md shadow-[#66CCFF]/20">
-                  <PawPrint className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold tracking-wider text-[#0284C7] uppercase">
-                    SOCIALIST REPUBLIC OF VIETNAM
-                  </h3>
-                  <h1 className="text-base sm:text-lg font-black tracking-wide text-slate-900 flex items-center gap-1.5">
-                    HỘ CHIẾU THÚ CƯNG
-                    <span className="text-xs font-normal text-slate-500">/ PET PASSPORT</span>
-                  </h1>
-                </div>
+            {/* ================= TRANG TRÁI: PET PASSPORT ================= */}
+            <div className="relative flex flex-col justify-between bg-gradient-to-b from-[#F2F8FD] via-[#F6FAFD] to-[#E5F1FA] rounded-2xl p-4 sm:p-6 border border-[#CDE1F0] min-h-[460px] sm:min-h-[500px]">
+              {/* Watermarks */}
+              <div className="absolute top-3 left-4 text-slate-300/40 pointer-events-none">
+                <PawPrint className="w-8 h-8 rotate-[-15deg]" />
+              </div>
+              <div className="absolute bottom-4 right-6 text-slate-300/30 pointer-events-none">
+                <PawPrint className="w-12 h-12 rotate-[25deg]" />
               </div>
 
-              {/* Digital Chip Badge */}
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#E6F7FF] border border-[#66CCFF]/40 text-[#0284C7] text-xs font-semibold">
-                  <Cpu className="w-3.5 h-3.5 text-[#66CCFF]" />
-                  <span>BIOMETRIC CHIP</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-0.5">ISO 11784/11785</span>
-              </div>
-            </div>
-
-            {/* Thân thẻ: Ảnh + Thông tin chi tiết */}
-            <div className="relative z-10 grid grid-cols-12 gap-4 sm:gap-6 my-auto pt-2">
-              {/* Cột Trái: Ảnh đại diện + Pet Code */}
-              <div className="col-span-4 sm:col-span-4 flex flex-col items-center">
-                <div className="relative w-24 h-28 sm:w-32 sm:h-36 rounded-2xl overflow-hidden border-2 border-white shadow-lg ring-2 ring-[#66CCFF]/50 bg-slate-100 group">
-                  <img
-                    src={pet.avatarUrl}
-                    alt={pet.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    crossOrigin="anonymous"
-                  />
-                  {/* Verified Watermark Badge */}
-                  <div className="absolute bottom-1 right-1 bg-white/90 backdrop-blur-sm p-1 rounded-full shadow-sm">
-                    <ShieldCheck className="w-4 h-4 text-[#0EA5E9]" />
-                  </div>
-                </div>
-
-                {/* Pet Code badge with copy */}
-                <button
-                  onClick={handleCopyCode}
-                  className="mt-2.5 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#E6F7FF] text-slate-800 text-xs font-mono font-bold tracking-wider border border-slate-200 transition-colors"
-                  title="Click để sao chép mã hộ chiếu"
-                >
-                  <span>{pet.petCode}</span>
-                  {copied && <CheckCircle2 className="w-3 h-3 text-emerald-600 ml-0.5" />}
-                </button>
+              {/* Header Trang Trái */}
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <PawPrint className="w-5 h-5 text-[#1E3A5F]" />
+                <h3 className="text-base sm:text-lg font-black tracking-widest text-[#1E3A5F] uppercase">
+                  PET PASSPORT
+                </h3>
               </div>
 
-              {/* Cột Phải: Bảng thông số định danh */}
-              <div className="col-span-8 sm:col-span-8 grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:text-sm">
-                <div className="col-span-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Tên / Given Name</span>
-                  <span className="text-base sm:text-lg font-black text-slate-900 tracking-wide">{pet.name}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Loài / Species</span>
-                  <span className="font-semibold text-slate-800">{pet.species}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Giới tính / Sex</span>
-                  <span className="font-semibold text-slate-800">{pet.sex}</span>
-                </div>
-
-                <div className="col-span-2 sm:col-span-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Giống / Breed</span>
-                  <span className="font-semibold text-slate-800 truncate block">{pet.breed}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Cân nặng / Weight</span>
-                  <span className="font-semibold text-slate-800">{pet.weight}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Ngày sinh / Date of Birth</span>
-                  <span className="font-semibold text-slate-800">{pet.birthday}</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Chủ sở hữu / Owner</span>
-                  <span className="font-semibold text-slate-800 truncate block">{pet.owner?.fullName || 'N/A'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Dải mã vạch MRZ (Machine Readable Zone) chuẩn hộ chiếu quốc tế */}
-            <div className="relative z-10 mt-auto pt-2 border-t border-slate-200/80 bg-slate-50/70 -mx-5 -mb-5 sm:-mx-7 sm:-mb-7 px-5 py-2 sm:px-7 rounded-b-3xl">
-              <div className="font-mono text-[10px] sm:text-[11px] leading-tight text-slate-600 tracking-[0.22em] font-semibold select-none overflow-hidden text-center sm:text-left">
-                <div>{mrzLine1}</div>
-                <div>{mrzLine2}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* ========================================================= */}
-          {/* MẶT SAU (MEDICAL & RESCUE)                                 */}
-          {/* ========================================================= */}
-          <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-3xl bg-gradient-to-br from-white via-white to-[#FFF5F2] border-2 border-[#FF8A65]/30 shadow-xl overflow-hidden flex flex-col justify-between p-5 sm:p-7">
-            {/* Header Mặt Sau */}
-            <div className="relative z-10 flex items-center justify-between border-b border-orange-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#FF8A65] to-amber-300 flex items-center justify-center shadow-md shadow-[#FF8A65]/20">
-                  <HeartPulse className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-orange-600 uppercase tracking-wider">
-                    MEDICAL & EMERGENCY RESCUE
-                  </h3>
-                  <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                    HỒ SƠ Y TẾ & CỨU HỘ KHẨN CẤP
-                  </h2>
-                </div>
-              </div>
-
-              {/* Microchip Badge */}
-              <div className="text-right">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Số Microchip</span>
-                <span className="font-mono text-xs sm:text-sm font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md">
-                  {pet.microchip}
-                </span>
-              </div>
-            </div>
-
-            {/* Nội dung trung tâm: Cảnh báo y tế + QR cứu hộ */}
-            <div className="relative z-10 grid grid-cols-12 gap-4 my-auto pt-2 items-center">
-              {/* Khung bên trái: Cảnh báo dị ứng & thuốc men */}
-              <div className="col-span-7 sm:col-span-8 space-y-2.5">
-                {/* Khung cảnh báo dị ứng màu cam/đỏ dịu */}
-                <div className="bg-[#FFF5F2] border border-[#FF8A65]/40 rounded-2xl p-3 shadow-xs">
-                  <div className="flex items-center gap-1.5 text-orange-700 font-bold text-xs mb-1">
-                    <BadgeAlert className="w-4 h-4 text-[#FF8A65]" />
-                    <span>CẢNH BÁO DỊ ỨNG (ALLERGIES)</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {pet.emergency?.allergies?.length > 0 ? (
-                      pet.emergency.allergies.map((allergy, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[11px] font-medium bg-white text-orange-800 px-2 py-0.5 rounded-lg border border-orange-200/80 shadow-xs"
-                        >
-                          ⚠️ {allergy}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-slate-400">Không có tiền sử dị ứng</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Thuốc men & điều trị */}
-                <div className="bg-amber-50/70 border border-amber-200/70 rounded-2xl p-2.5 text-xs">
-                  <div className="font-bold text-amber-900 text-[11px] mb-1 flex items-center gap-1">
-                    <span>💊 Thuốc đang điều trị:</span>
-                  </div>
-                  <div className="text-slate-700 space-y-0.5 text-[11px]">
-                    {pet.emergency?.medications?.map((med, idx) => (
-                      <div key={idx} className="flex items-start gap-1">
-                        <span className="text-amber-500">•</span>
-                        <span>{med}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Ghi chú tính cách */}
-                <div className="text-xs bg-slate-50 border border-slate-200/80 rounded-xl p-2 text-slate-600">
-                  <span className="font-semibold text-slate-700">Ghi chú tính cách: </span>
-                  <span>{pet.emergency?.specialNote || pet.bio}</span>
-                </div>
-              </div>
-
-              {/* Khung bên phải: Mã QR Cứu hộ độc bản */}
-              <div className="col-span-5 sm:col-span-4 flex flex-col items-center justify-center text-center pl-2">
-                <div className="p-2.5 bg-white rounded-2xl shadow-md border-2 border-[#66CCFF]/40 ring-4 ring-[#E6F7FF] flex flex-col items-center">
-                  {/* Generated QR Placeholder / Real QR img */}
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center bg-slate-900 rounded-xl p-1 relative overflow-hidden">
+              {/* Body Trang Trái */}
+              <div className="grid grid-cols-12 gap-3 sm:gap-4 my-auto items-start">
+                {/* Cột Trái: Ảnh & Quote */}
+                <div className="col-span-5 flex flex-col items-center">
+                  <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-white shadow-md bg-slate-200">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                        rescueUrl
-                      )}`}
-                      alt="Rescue QR Code"
-                      className="w-full h-full object-contain bg-white rounded-lg p-1"
+                      src={currentPet.avatarUrl}
+                      alt={currentPet.name}
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                  </div>
+                  <div className="mt-3 text-center">
+                    <p className="text-xs sm:text-sm font-medium italic text-[#1E3A5F] font-serif leading-tight whitespace-pre-line">
+                      "{currentPet.quote}"
+                    </p>
+                    <div className="flex items-center justify-center text-[#0284C7] mt-1">
+                      <Heart className="w-3.5 h-3.5 fill-[#0284C7]" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cột Phải: Các thông số định danh */}
+                <div className="col-span-7 space-y-2 text-xs sm:text-sm pl-1">
+                  <div className="mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="text-xl sm:text-2xl font-black text-[#1E3A5F] tracking-tight">
+                        {currentPet.name}
+                      </h2>
+                      <PawPrint className="w-4 h-4 text-[#1E3A5F]" />
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                      PET ID <span className="font-mono text-[#0284C7] font-bold">{currentPet.petCode}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <Cat className="w-4 h-4 text-[#1E3A5F] mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase leading-none">
+                        Species
+                      </span>
+                      <span className="font-bold text-[#1E3A5F]">{currentPet.species}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <PawPrint className="w-4 h-4 text-[#1E3A5F] mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase leading-none">
+                        Breed
+                      </span>
+                      <span className="font-bold text-[#1E3A5F] leading-tight block truncate">
+                        {currentPet.breed}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="text-sm font-bold text-[#1E3A5F] leading-none">⚥</span>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase leading-none">
+                        Sex
+                      </span>
+                      <span className="font-bold text-[#1E3A5F]">{currentPet.sex}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <Calendar className="w-4 h-4 text-[#1E3A5F] mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase leading-none">
+                        Birthday
+                      </span>
+                      <span className="font-bold text-[#1E3A5F]">{currentPet.birthday}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <Scale className="w-4 h-4 text-[#1E3A5F] mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase leading-none">
+                        Weight
+                      </span>
+                      <span className="font-bold text-[#1E3A5F]">{currentPet.weight}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chân Trang Trái: Owner & Footer */}
+              <div className="mt-4 pt-3 border-t border-[#CDE1F0]">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-[#1E3A5F]">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block leading-none">
+                      OWNER
+                    </span>
+                    <span className="text-xs sm:text-sm font-black text-[#1E3A5F]">
+                      {currentPet.ownerName}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-center text-[10px] font-bold text-slate-400 tracking-widest uppercase">
+                  - PET PASSPORT -
+                </div>
+              </div>
+            </div>
+
+            {/* ================= TRANG PHẢI: DIGITAL PET ID ================= */}
+            <div className="relative flex flex-col justify-between bg-gradient-to-b from-[#F2F8FD] via-[#F6FAFD] to-[#E5F1FA] rounded-2xl p-4 sm:p-6 border border-[#CDE1F0] min-h-[460px] sm:min-h-[500px]">
+              <div className="absolute bottom-4 right-4 text-slate-300/30 pointer-events-none">
+                <PawPrint className="w-10 h-10 rotate-[15deg]" />
+              </div>
+
+              {/* Header Trang Phải */}
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <FileText className="w-5 h-5 text-[#1E3A5F]" />
+                <h3 className="text-base sm:text-lg font-black tracking-widest text-[#1E3A5F] uppercase">
+                  DIGITAL PET ID
+                </h3>
+              </div>
+
+              {/* Phần 1: Khối QR Code */}
+              <div className="grid grid-cols-12 gap-3 items-center bg-white/80 p-3.5 rounded-2xl border border-[#D5E6F3] shadow-xs">
+                <div className="col-span-5 flex justify-center">
+                  <div className="p-1.5 bg-white rounded-xl shadow-xs border border-slate-200">
+                    <img
+                      src={qrImageUrl}
+                      alt="Pet Owner QR Code"
+                      className="w-24 h-24 sm:w-28 sm:h-28 object-contain"
                       crossOrigin="anonymous"
                     />
                   </div>
                 </div>
-                <div className="mt-2 text-center">
-                  <span className="text-[10px] font-black text-[#0284C7] uppercase tracking-wide block">
-                    QUÉT ĐỂ CỨU HỘ
-                  </span>
-                  <span className="text-[9px] text-slate-500 block leading-tight">
-                    Scan when pet is lost
-                  </span>
+
+                <div className="col-span-7 pl-1">
+                  <p className="text-xs sm:text-sm font-bold text-[#1E3A5F] leading-snug">
+                    Scan QR to view pet profile & owner contact
+                  </p>
+                  <div className="flex items-center text-[#0284C7] mt-1.5">
+                    <Heart className="w-4 h-4 fill-[#0284C7]" />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Chân thẻ mặt sau: Thông tin liên lạc khẩn cấp */}
-            <div className="relative z-10 mt-auto pt-2 border-t border-slate-200 text-xs text-slate-600 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Liên hệ khẩn cấp (SĐT Chủ)</span>
-                <span className="font-bold text-slate-900 text-sm">{pet.owner?.phone || '0901234567'}</span>
+              {/* Phần 2: Khung EMERGENCY ALERT */}
+              <div className="my-3 bg-[#F0F6FB] border border-[#D0E2F0] rounded-2xl p-3.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-[#D9383A] font-black text-xs sm:text-sm uppercase tracking-wide">
+                  <AlertTriangle className="w-4 h-4 text-[#D9383A]" />
+                  <span>EMERGENCY ALERT</span>
+                </div>
+
+                <div className="text-xs text-[#1E3A5F] space-y-1 pt-1 font-medium">
+                  <div>
+                    <span className="font-bold text-[#1E3A5F]">Allergy: </span>
+                    <span>{currentPet.emergency?.allergy || 'None'}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#1E3A5F]">Medication: </span>
+                    <span>{currentPet.emergency?.medication || 'None'}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#1E3A5F]">Special Note: </span>
+                    <span>{currentPet.emergency?.specialNote || 'Friendly'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Địa chỉ đăng ký</span>
-                <span className="text-xs font-semibold text-slate-700">{pet.owner?.address || 'Việt Nam'}</span>
+
+              {/* Phần 3: Khung Contact Owner */}
+              <div className="bg-white/80 border border-[#D5E6F3] rounded-2xl p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center shrink-0">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-[#1E3A5F] truncate">
+                    Contact Owner: <span className="font-mono text-[#0284C7]">{currentPet.ownerPhone}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    Scan QR or visit petpassport.com
+                  </div>
+                </div>
+              </div>
+
+              {/* Chân Trang Phải */}
+              <div className="mt-4 pt-2 text-center">
+                <p className="text-sm font-serif italic text-[#1E3A5F] font-semibold flex items-center justify-center gap-1">
+                  Help me get home ♡
+                </p>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Helper text */}
-      <div className="flex items-center gap-1.5 mt-4 text-xs text-slate-400">
-        <Sparkles className="w-3.5 h-3.5 text-[#66CCFF]" />
-        <span>Click <b>"Lật thẻ"</b> để xem 2 mặt hộ chiếu. Nhấn <b>"Tải hộ chiếu"</b> để xuất file PDF in ấn chuẩn quốc tế.</span>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* HIDDEN OFFLINE CONTAINER DÙNG ĐỂ RENDER HTML2CANVAS 2 MẶT SẮC NÉT KHÔNG BỊ XOAY 3D */}
-      {/* ========================================================================= */}
-      <div
-        ref={exportContainerRef}
-        style={{ display: 'none', position: 'fixed', left: '-9999px', top: 0, flexDirection: 'column', gap: '30px' }}
-      >
-        {/* Export Face 1: Mặt trước (Flat 2D, width 680px) */}
-        <div
-          id="export-card-front"
-          style={{
-            width: '680px',
-            height: '430px',
-            backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            border: '2px solid rgba(102, 204, 255, 0.5)',
-            padding: '28px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            fontFamily: 'Inter, sans-serif',
-            boxSizing: 'border-box',
-          }}
-        >
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(102, 204, 255, 0.3)', paddingBottom: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '44px', height: '44px', backgroundColor: '#66CCFF', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: '#fff', fontSize: '24px' }}>🐾</span>
-              </div>
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284C7', letterSpacing: '1px' }}>SOCIALIST REPUBLIC OF VIETNAM</div>
-                <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A' }}>HỘ CHIẾU THÚ CƯNG <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#64748B' }}>/ PET PASSPORT</span></div>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284C7', backgroundColor: '#E6F7FF', padding: '4px 10px', borderRadius: '8px' }}>BIOMETRIC CHIP</div>
-              <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>ISO 11784/11785</div>
-            </div>
-          </div>
-
-          {/* Body */}
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', margin: 'auto 0' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <img
-                src={pet.avatarUrl}
-                alt={pet.name}
-                style={{ width: '130px', height: '145px', objectFit: 'cover', borderRadius: '16px', border: '2px solid #66CCFF' }}
-                crossOrigin="anonymous"
-              />
-              <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace', backgroundColor: '#F1F5F9', padding: '3px 8px', borderRadius: '6px' }}>
-                {pet.petCode}
-              </div>
-            </div>
-
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
-              <div style={{ gridColumn: 'span 2' }}>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>TÊN / GIVEN NAME</div>
-                <div style={{ fontSize: '18px', fontWeight: '900', color: '#0F172A' }}>{pet.name}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>LOÀI / SPECIES</div>
-                <div style={{ fontWeight: '600', color: '#1E293B' }}>{pet.species}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>GIỚI TÍNH / SEX</div>
-                <div style={{ fontWeight: '600', color: '#1E293B' }}>{pet.sex}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>GIỐNG / BREED</div>
-                <div style={{ fontWeight: '600', color: '#1E293B' }}>{pet.breed}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>CÂN NẶNG / WEIGHT</div>
-                <div style={{ fontWeight: '600', color: '#1E293B' }}>{pet.weight}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>NGÀY SINH / BIRTHDAY</div>
-                <div style={{ fontWeight: '600', color: '#1E293B' }}>{pet.birthday}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>CHỦ NUÔI / OWNER</div>
-                <div style={{ fontWeight: '600', color: '#1E293B' }}>{pet.owner?.fullName || 'N/A'}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* MRZ footer */}
-          <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px', backgroundColor: '#F8FAFC', margin: '-10px -28px -28px -28px', padding: '10px 28px', borderRadius: '0 0 24px 24px', fontFamily: 'monospace', fontSize: '11px', letterSpacing: '3px', color: '#475569' }}>
-            <div>{mrzLine1}</div>
-            <div>{mrzLine2}</div>
-          </div>
+      ) : (
+        /* Empty State nếu đã xóa hết pet */
+        <div className="w-full bg-white p-12 rounded-3xl border-2 border-dashed border-slate-300 text-center">
+          <PawPrint className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-slate-800">
+            Bạn chưa có thú cưng nào trong sổ
+          </h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            Hãy tạo hộ chiếu điện tử đầu tiên cho chú thú cưng của bạn để bắt đầu lưu trữ hồ sơ và tạo mã QR.
+          </p>
+          <button
+            onClick={handleOpenCreateModal}
+            className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tạo Hộ Chiếu Ngay</span>
+          </button>
         </div>
+      )}
 
-        {/* Export Face 2: Mặt sau (Medical & Rescue) */}
-        <div
-          id="export-card-back"
-          style={{
-            width: '680px',
-            height: '430px',
-            backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            border: '2px solid rgba(255, 138, 101, 0.4)',
-            padding: '28px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            fontFamily: 'Inter, sans-serif',
-            boxSizing: 'border-box',
-          }}
-        >
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #FED7AA', paddingBottom: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '44px', height: '44px', backgroundColor: '#FF8A65', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: '#fff', fontSize: '22px' }}>🩺</span>
+      {/* ========================================================================= */}
+      {/* MODAL THÊM / CHỈNH SỬA THÔNG TIN THÚ CƯNG                                 */}
+      {/* ========================================================================= */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-7 shadow-2xl border border-slate-100 my-8">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#66CCFF] text-white flex items-center justify-center">
+                  <PawPrint className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    {modalMode === 'create'
+                      ? 'Thêm Hộ Chiếu Thú Cưng Mới'
+                      : `Chỉnh Sửa Hộ Chiếu Bé ${formData.name}`}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {modalMode === 'create'
+                      ? 'Nhập thông tin và tải ảnh để bổ sung bé mới vào sổ hộ chiếu'
+                      : 'Cập nhật lại thông tin định danh và hồ sơ y tế của bé'}
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitPet} className="space-y-4 text-xs sm:text-sm">
+              {/* Tải ảnh từ thư mục máy tính */}
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#EA580C', letterSpacing: '1px' }}>MEDICAL & EMERGENCY RESCUE</div>
-                <div style={{ fontSize: '17px', fontWeight: '900', color: '#0F172A' }}>HỒ SƠ Y TẾ & CỨU HỘ KHẨN CẤP</div>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#94A3B8' }}>MICROCHIP NUMBER</div>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'monospace', backgroundColor: '#F1F5F9', padding: '3px 8px', borderRadius: '6px' }}>{pet.microchip}</div>
-            </div>
-          </div>
-
-          {/* Center Content */}
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', margin: 'auto 0' }}>
-            <div style={{ flex: 1 }}>
-              {/* Alert Box */}
-              <div style={{ backgroundColor: '#FFF5F2', border: '1px solid #FED7AA', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#C2410C', marginBottom: '4px' }}>⚠️ CẢNH BÁO DỊ ỨNG (ALLERGIES)</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {pet.emergency?.allergies?.map((item, i) => (
-                    <span key={i} style={{ fontSize: '11px', backgroundColor: '#FFFFFF', padding: '2px 8px', borderRadius: '6px', border: '1px solid #FED7AA', color: '#9A3412' }}>
-                      {item}
-                    </span>
-                  ))}
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Ảnh đại diện thú cưng <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 bg-slate-100 shrink-0">
+                    <img
+                      src={previewImage}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-[#E6F7FF] text-slate-700 hover:text-[#0284C7] font-semibold text-xs rounded-xl border border-slate-200 transition-colors"
+                    >
+                      <Upload className="w-4 h-4 text-[#66CCFF]" />
+                      <span>Chọn ảnh từ thư mục máy tính</span>
+                    </button>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Hỗ trợ PNG, JPG, JPEG (Tối đa 5MB)
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Medication */}
-              <div style={{ backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '12px', padding: '8px 12px', fontSize: '11px', marginBottom: '8px' }}>
-                <div style={{ fontWeight: 'bold', color: '#92400E' }}>💊 Thuốc điều trị:</div>
-                <div style={{ color: '#78350F' }}>{pet.emergency?.medications?.join(', ')}</div>
+              {/* Tên & Pet ID */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Tên thú cưng <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Ví dụ: Mochi, Bơ..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Pet ID (Mã hộ chiếu)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.petCode}
+                    onChange={(e) => setFormData({ ...formData, petCode: e.target.value })}
+                    placeholder="Ví dụ: VN-MOCHI-001"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                  />
+                </div>
               </div>
 
-              {/* Note */}
-              <div style={{ backgroundColor: '#F8FAFC', borderRadius: '10px', padding: '8px 12px', fontSize: '11px', color: '#475569' }}>
-                <b>Ghi chú:</b> {pet.emergency?.specialNote || pet.bio}
+              {/* Loài, Giống, Giới tính */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Loài (Species)
+                  </label>
+                  <select
+                    value={formData.species}
+                    onChange={(e) => setFormData({ ...formData, species: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                  >
+                    <option value="Cat">Mèo (Cat)</option>
+                    <option value="Dog">Chó (Dog)</option>
+                    <option value="Rabbit">Thỏ (Rabbit)</option>
+                    <option value="Other">Khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Giống loài (Breed)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.breed}
+                    onChange={(e) => setFormData({ ...formData, breed: e.target.value })}
+                    placeholder="British Shorthair, Corgi..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Giới tính (Sex)
+                  </label>
+                  <select
+                    value={formData.sex}
+                    onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                  >
+                    <option value="Female">Female (Cái)</option>
+                    <option value="Male">Male (Đực)</option>
+                  </select>
+                </div>
               </div>
-            </div>
 
-            {/* QR Code */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-              <div style={{ padding: '8px', backgroundColor: '#fff', borderRadius: '16px', border: '2px solid #66CCFF', boxShadow: '0 4px 12px rgba(102, 204, 255, 0.2)' }}>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(rescueUrl)}`}
-                  alt="QR Code"
-                  style={{ width: '105px', height: '105px', display: 'block' }}
-                  crossOrigin="anonymous"
+              {/* Ngày sinh & Cân nặng */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Ngày sinh (Birthday)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.birthday}
+                    onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
+                    placeholder="Ví dụ: 12 May 2024"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Cân nặng (Weight)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                    placeholder="Ví dụ: 3.8 kg"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                  />
+                </div>
+              </div>
+
+              {/* Quote */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Câu nói / Giới thiệu tính cách (Quote)
+                </label>
+                <input
+                  type="text"
+                  value={formData.quote}
+                  onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
+                  placeholder="Ví dụ: Small cat, Big personality."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
                 />
               </div>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0284C7', marginTop: '6px' }}>QUÉT ĐỂ CỨU HỘ</div>
-            </div>
-          </div>
 
-          {/* Bottom */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #E2E8F0', paddingTop: '8px', fontSize: '12px' }}>
-            <div>
-              <span style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 'bold' }}>LIÊN HỆ CHỦ NUÔI: </span>
-              <span style={{ fontWeight: 'bold', color: '#0F172A' }}>{pet.owner?.phone}</span>
+              {/* Chủ sở hữu */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                <span className="text-xs font-black text-[#1E3A5F] block uppercase">
+                  Thông Tin Chủ Sở Hữu (Tạo Mã QR)
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Họ tên chủ nuôi
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ownerName}
+                      onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
+                      placeholder="Scarlett Nguyen"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Số điện thoại liên hệ
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ownerPhone}
+                      onChange={(e) => setFormData({ ...formData, ownerPhone: e.target.value })}
+                      placeholder="0901234567"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#66CCFF]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dị ứng & Y tế */}
+              <div className="p-3 bg-[#FFF5F2] rounded-2xl border border-[#FED7AA] space-y-2">
+                <span className="text-xs font-black text-[#D9383A] block uppercase flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Cảnh Báo Y Tế & Dị Ứng (Emergency Alert)
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Dị ứng (Allergy)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.allergy}
+                      onChange={(e) => setFormData({ ...formData, allergy: e.target.value })}
+                      placeholder="Seafood, None..."
+                      className="w-full px-3 py-2 rounded-xl border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF8A65]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Thuốc men (Medication)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.medication}
+                      onChange={(e) => setFormData({ ...formData, medication: e.target.value })}
+                      placeholder="None, Thuốc men..."
+                      className="w-full px-3 py-2 rounded-xl border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF8A65]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    Ghi chú đặc biệt (Special Note)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.specialNote}
+                    onChange={(e) => setFormData({ ...formData, specialNote: e.target.value })}
+                    placeholder="Shy but affectionate..."
+                    className="w-full px-3 py-2 rounded-xl border border-orange-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#FF8A65]"
+                  />
+                </div>
+              </div>
+
+              {/* Submit buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] font-bold text-white shadow-md transition-all active:scale-95"
+                >
+                  {modalMode === 'create' ? 'Tạo Hộ Chiếu Ngay' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL XÁC NHẬN XÓA THÚ CƯNG                                              */}
+      {/* ========================================================================= */}
+      {isDeleteModalOpen && currentPet && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
             </div>
-            <div>
-              <span style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 'bold' }}>ĐỊA CHỈ: </span>
-              <span style={{ color: '#475569' }}>{pet.owner?.address}</span>
+
+            <h3 className="text-base font-black text-slate-900">
+              Xác Nhận Xóa Hộ Chiếu?
+            </h3>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Bạn có chắc chắn muốn xóa hộ chiếu của bé{' '}
+              <b className="text-slate-900">{currentPet.name}</b> (Mã: {currentPet.petCode})? Dữ liệu này sẽ bị gỡ bỏ khỏi sổ hộ chiếu của bạn.
+            </p>
+
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 font-bold text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 font-bold text-xs text-white shadow-md transition-all active:scale-95"
+              >
+                Xác Nhận Xóa
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
