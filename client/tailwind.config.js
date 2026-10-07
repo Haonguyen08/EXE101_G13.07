@@ -18,8 +18,23 @@ export default {
           400: '#66CCFF',
           500: '#0EA5E9',
           600: '#0284C7',
+          700: '#0369A1',
         },
         pastelWhite: '#FFFFFF',
+        alertSoft: {
+          DEFAULT: '#FF8A65',
+          bg: '#FFF5F2',
+          border: '#FED7AA',
+          text: '#C2410C',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['Courier Prime', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      boxShadow: {
+        'sky-soft': '0 10px 25px -5px rgba(102, 204, 255, 0.25)',
+        'sky-glow': '0 0 20px rgba(102, 204, 255, 0.35)',
       },
     },
   },
