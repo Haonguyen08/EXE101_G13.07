@@ -66,10 +66,10 @@ const Home = () => {
           <nav className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/p/VN-PAW-882341"
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl border border-rose-200 transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-[#0284C7] bg-[#E6F7FF] hover:bg-[#BAE6FD]/40 rounded-xl border border-[#66CCFF]/40 transition-colors"
             >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Trang Quét Cứu Hộ (/p)</span>
+              <QrCode className="w-3.5 h-3.5 text-[#66CCFF]" />
+              <span>Xem Hồ Sơ QR (/p)</span>
             </Link>
 
             <Link
@@ -87,13 +87,13 @@ const Home = () => {
       <section className="pt-8 pb-4 text-center px-4 max-w-3xl mx-auto">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E6F7FF] text-[#0284C7] text-xs font-bold border border-[#66CCFF]/30 mb-3 shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-[#66CCFF]" />
-          <span>Công Nghệ Hộ Chiếu Số Thú Cưng Đạt Chuẩn ICAO</span>
+          <span>Hệ Thống Định Danh & Hộ Chiếu Số Thú Cưng</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-          Hộ Chiếu Điện Tử & Mã QR Cứu Hộ Độc Bản
+          Hộ Chiếu Điện Tử & Mã QR Thông Tin Thú Cưng
         </h2>
         <p className="text-sm sm:text-base text-slate-600 mt-2">
-          Bảo vệ thú cưng toàn diện với thẻ hộ chiếu 3D, mã định danh duy nhất, hồ sơ y tế khẩn cấp và công cụ xuất file PDF in ấn chuẩn quốc tế.
+          Quản lý thông tin thú cưng toàn diện với thẻ hộ chiếu 3D, mã QR quét xem hồ sơ y tế, tiêm chủng và liên hệ chủ nuôi nhanh chóng.
         </p>
       </section>
 
@@ -106,24 +106,24 @@ const Home = () => {
       <section className="max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
         <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs hover:border-[#66CCFF] transition-all group">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <QrCode className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-[#E6F7FF] text-[#0284C7] flex items-center justify-center">
+              <QrCode className="w-5 h-5 text-[#66CCFF]" />
             </div>
             <div>
               <h3 className="font-extrabold text-slate-900 group-hover:text-[#0284C7] transition-colors">
-                Trang Cứu Hộ Di Động (Rescue Page)
+                Trang Thông Tin Khi Quét QR
               </h3>
               <p className="text-xs text-slate-500">Đường dẫn: <code>/p/:petCode</code></p>
             </div>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed mb-4">
-            Màn hình hiển thị tức thì khi người qua đường dùng camera điện thoại quét mã QR trên vòng cổ thú cưng đi lạc. Đẩy cảnh báo dị ứng lên đầu và có nút gọi điện/nhắn tin khẩn cấp.
+            Màn hình hiển thị đầy đủ hồ sơ của chú thú cưng khi ai đó quét mã QR trên vòng cổ hoặc thẻ hộ chiếu: thông tin định danh, sổ tiêm phòng, lưu ý dị ứng và thông tin liên hệ chủ nuôi.
           </p>
           <Link
             to="/p/VN-PAW-882341"
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0284C7] hover:underline"
           >
-            <span>Trải nghiệm màn hình cứu hộ</span>
+            <span>Trải nghiệm trang thông tin QR</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </Link>
         </div>
