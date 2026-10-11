@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PassportCard from '../components/passport/PassportCard';
+import { useAuth } from '../context/AuthContext';
+import { petService } from '../services/petService';
 import {
   PawPrint,
   ShieldCheck,
@@ -11,38 +13,72 @@ import {
   Heart,
   FileCheck,
   CheckCircle2,
-  Share2
+  Share2,
+  LogIn,
+  LogOut,
+  User,
+  Database,
+  Loader2
 } from 'lucide-react';
 
 const Home = () => {
-  const [activePet, setActivePet] = useState({
-    petCode: 'VN-PAW-882341',
-    name: 'Bơ (Avocado)',
-    species: 'Chó (Canine)',
-    breed: 'Corgi Pembroke Welsh',
-    sex: 'Đực (Male)',
-    birthday: '15/06/2022',
-    weight: '11.5 kg',
-    avatarUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=600&q=80',
-    bio: 'Bé rất thân thiện, thích ăn táo và thích được vuốt cằm. Rất quấn người.',
-    microchip: '981098108427192',
-    issueDate: '01/01/2024',
-    expiryDate: 'Vô thời hạn',
-    owner: {
-      fullName: 'Nguyễn Văn Hào',
-      phone: '0901234567',
-      address: 'Quận 7, TP. Hồ Chí Minh'
-    },
-    emergency: {
-      allergies: ['Dị ứng tôm/cua (Hải sản)', 'Dị ứng kháng sinh Penicillin'],
-      medications: ['Bổ sung men tiêu hóa định kỳ', 'Thuốc xịt dị ứng ngoài da'],
-      specialNote: 'Bé sợ sấm sét và tiếng pháo hoa lớn. Nhát nước.'
-    },
-    qrCode: {
-      qrUrl: `${window.location.origin}/p/VN-PAW-882341`,
-      qrImageUrl: ''
-    }
-  });
+  const { user, isAuthenticated, logout } = useAuth();
+  const [dbPets, setDbPets] = useState([]);
+  const [loadingPets, setLoadingPets] = useState(true);
+  const [selectedPetIndex, setSelectedPetIndex] = useState(0);
+
+  // Tải danh sách thú cưng thực tế từ MongoDB
+  useEffect(() => {
+    const fetchPetsFromDB = async () => {
+      try {
+        setLoadingPets(true);
+        const res = await petService.getAllPublicPets();
+        if (res.success && res.data) {
+          setDbPets(res.data);
+        }
+      } catch (err) {
+        console.error('Lỗi nạp thú cưng từ MongoDB:', err);
+      } finally {
+        setLoadingPets(false);
+      }
+    };
+    fetchPetsFromDB();
+  }, []);
+
+  // Danh sách thú cưng hiển thị: ưu tiên thú cưng của user nếu đã đăng nhập, ngược lại hiển thị thú cưng từ DB
+  const displayPets = (isAuthenticated && user?.pets && user.pets.length > 0)
+    ? user.pets.map((p) => ({
+        _id: p._id,
+        petCode: p.petCode,
+        name: p.name,
+        species: p.species || 'Chó / Mèo',
+        breed: p.breed || 'Chưa cập nhật',
+        sex: p.sex || 'Đực',
+        birthday: p.birthday ? new Date(p.birthday).toLocaleDateString('vi-VN') : 'Chưa cập nhật',
+        weight: `${p.weight || 10} kg`,
+        avatarUrl: p.avatarUrl || 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=600&q=80',
+        bio: p.bio || 'Thú cưng được cấp hộ chiếu chính chủ.',
+        microchip: '98109810' + (p.petCode.replace(/\D/g, '') || '001'),
+        issueDate: '07/10/2026',
+        expiryDate: 'Vô thời hạn',
+        owner: {
+          fullName: user.profile?.fullName || user.username,
+          phone: user.profile?.phone || '0901234567',
+          address: user.profile?.address || 'Việt Nam'
+        },
+        emergency: {
+          allergies: ['Dị ứng thức ăn lạ'],
+          medications: ['Bổ sung men tiêu hóa'],
+          specialNote: p.bio || 'Bé rất thân thiện và quấn người.'
+        },
+        qrCode: {
+          qrUrl: `${window.location.origin}/p/${p.petCode}`,
+          qrImageUrl: ''
+        }
+      }))
+    : dbPets;
+
+  const activePet = displayPets[selectedPetIndex] || displayPets[0] || null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-[#E6F7FF]/30 flex flex-col">
@@ -65,20 +101,52 @@ const Home = () => {
 
           <nav className="flex items-center gap-2 sm:gap-3">
             <Link
-              to="/p/VN-PAW-882341"
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-[#0284C7] bg-[#E6F7FF] hover:bg-[#BAE6FD]/40 rounded-xl border border-[#66CCFF]/40 transition-colors"
+              to={activePet?.petCode ? `/p/${activePet.petCode}` : '/p/VN-MOCHI-001'}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-[#0284C7] bg-[#E6F7FF] hover:bg-[#BAE6FD]/40 rounded-xl border border-[#66CCFF]/40 transition-colors"
             >
               <QrCode className="w-3.5 h-3.5 text-[#66CCFF]" />
-              <span>Xem Hồ Sơ QR (/p)</span>
+              <span className="hidden sm:inline">Hồ Sơ QR</span>
             </Link>
 
-            <Link
-              to="/admin"
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 rounded-xl border border-slate-200 shadow-2xs transition-colors"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5 text-[#66CCFF]" />
-              <span>Quản Trị (/admin)</span>
-            </Link>
+            {user?.role === 'ADMIN' && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-200 shadow-2xs transition-colors"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5 text-purple-600" />
+                <span className="hidden sm:inline">Quản Trị (/admin)</span>
+              </Link>
+            )}
+
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 transition-colors"
+                  title="Xem thông tin tài khoản và danh sách thú cưng"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-[#66CCFF] text-white flex items-center justify-center text-[11px] font-black">
+                    {user.username?.[0]?.toUpperCase()}
+                  </div>
+                  <span className="max-w-[100px] truncate">{user.username}</span>
+                </Link>
+                <button
+                  onClick={logout}
+                  className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors border border-transparent hover:border-rose-200"
+                  title="Đăng xuất"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#0284C7] hover:bg-[#0369A1] rounded-xl shadow-md transition-all active:scale-95"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Đăng Nhập</span>
+              </Link>
+            )}
           </nav>
         </div>
       </header>
@@ -99,7 +167,45 @@ const Home = () => {
 
       {/* Main Interactive Demo Component: PassportCard */}
       <section className="flex-1 flex flex-col items-center justify-center py-4">
-        <PassportCard pet={activePet} />
+        {loadingPets ? (
+          <div className="py-16 flex flex-col items-center justify-center gap-3 text-slate-500">
+            <Loader2 className="w-8 h-8 text-[#0284C7] animate-spin" />
+            <span className="text-xs font-bold">Đang tải dữ liệu thú cưng từ MongoDB...</span>
+          </div>
+        ) : displayPets.length > 0 ? (
+          <>
+            <div className="flex items-center justify-center gap-2 mb-4 px-4 flex-wrap animate-in fade-in">
+              <div className="flex items-center gap-1.5 mr-1 text-slate-500 text-xs font-bold">
+                <Database className="w-3.5 h-3.5 text-[#0284C7]" />
+                <span>
+                  {isAuthenticated && user?.pets?.length > 0 ? 'Thú cưng của bạn:' : 'Thú cưng từ Database:'}
+                </span>
+              </div>
+              {displayPets.map((pet, idx) => (
+                <button
+                  key={pet._id || pet.petCode}
+                  onClick={() => setSelectedPetIndex(idx)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    selectedPetIndex === idx
+                      ? 'bg-[#0284C7] text-white shadow-md shadow-[#0284C7]/20 scale-105'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-2xs'
+                  }`}
+                >
+                  <span>🐾</span>
+                  <span>{pet.name}</span>
+                  <span className="text-[10px] opacity-80">({pet.petCode})</span>
+                </button>
+              ))}
+            </div>
+
+            {activePet && <PassportCard pet={activePet} />}
+          </>
+        ) : (
+          <div className="text-center py-12 text-slate-400 text-xs">
+            <PawPrint className="w-12 h-12 mx-auto text-slate-300 mb-2" />
+            Không có dữ liệu thú cưng trong cơ sở dữ liệu.
+          </div>
+        )}
       </section>
 
       {/* Quick Navigation Cards */}
@@ -120,10 +226,10 @@ const Home = () => {
             Màn hình hiển thị đầy đủ hồ sơ của chú thú cưng khi ai đó quét mã QR trên vòng cổ hoặc thẻ hộ chiếu: thông tin định danh, sổ tiêm phòng, lưu ý dị ứng và thông tin liên hệ chủ nuôi.
           </p>
           <Link
-            to="/p/VN-PAW-882341"
+            to={activePet ? `/p/${activePet.petCode}` : '/p/VN-MOCHI-001'}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0284C7] hover:underline"
           >
-            <span>Trải nghiệm trang thông tin QR</span>
+            <span>Trải nghiệm trang thông tin QR bé {activePet?.name || ''}</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </Link>
         </div>

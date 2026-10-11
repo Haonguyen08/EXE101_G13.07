@@ -33,80 +33,68 @@ const PublicRescuePage = () => {
   const [loading, setLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Dữ liệu mẫu chuẩn khi backend chưa chạy
-  const mockPetData = {
-    petCode: petCode || 'VN-PAW-882341',
-    name: 'Bơ (Avocado)',
-    species: 'Chó (Canine)',
-    breed: 'Corgi Pembroke Welsh',
-    sex: 'Đực (Male)',
-    birthday: '15/06/2022',
-    weight: '11.5 kg',
-    avatarUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=800&q=80',
-    bio: 'Bé Bơ rất thân thiện, quấn người và thích được gãi cằm. Thức ăn yêu thích là cà rốt luộc và ức gà.',
-    microchip: '981098108427192',
-    issueDate: '01/01/2024',
-    owner: {
-      fullName: 'Nguyễn Văn Hào',
-      phone: '0901234567',
-      address: 'Khu dân cư Him Lam, P. Tân Hưng, Quận 7, TP.HCM'
-    },
-    emergency: {
-      allergies: ['Dị ứng tôm/cua (Hải sản)', 'Dị ứng kháng sinh Penicillin'],
-      medications: ['Bổ sung men tiêu hóa định kỳ theo hướng dẫn bác sĩ thú y'],
-      specialNote: 'Bé sợ tiếng sấm sét và pháo hoa. Thích được vuốt ve nhẹ nhàng.'
-    }
-  };
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const fetchPetData = async () => {
       try {
         setLoading(true);
+        setErrorMessage('');
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
         const res = await axios.get(`${apiBaseUrl}/public/pets/${petCode}`);
         if (res.data && res.data.data) {
           setPetData(res.data.data);
         } else {
-          setPetData(mockPetData);
+          setErrorMessage(`Không tìm thấy hồ sơ của thú cưng ${petCode} trong cơ sở dữ liệu.`);
         }
       } catch (err) {
-        console.warn('Backend API chưa kết nối, nạp dữ liệu thú cưng mẫu:', err.message);
-        setPetData(mockPetData);
+        setErrorMessage(
+          err.response?.data?.message ||
+          `Không tìm thấy thú cưng có mã "${petCode}" trong cơ sở dữ liệu MongoDB.`
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPetData();
-  }, [petCode]);
-
-  const pet = petData || mockPetData;
-  const ownerPhone = pet.owner?.phone || '0901234567';
-  const cleanPhone = ownerPhone.replace(/[^0-9+]/g, '');
-  const zaloLink = `https://zalo.me/${cleanPhone}`;
-
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: `Hồ chiếu số của bé ${pet.name}`,
-        text: `Xem thông tin hộ chiếu điện tử của bé ${pet.name} (Mã: ${pet.petCode})`,
-        url: window.location.href,
-      });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
+    if (petCode) {
+      fetchPetData();
     }
-  };
+  }, [petCode]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 border-4 border-[#66CCFF] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-slate-500 font-medium text-sm">Đang tải thông tin thú cưng...</p>
+        <p className="text-slate-600 font-bold text-sm">Đang tải hồ sơ cứu hộ từ cơ sở dữ liệu...</p>
       </div>
     );
   }
+
+  if (errorMessage || !petData) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-3xl bg-rose-50 text-rose-500 flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-slate-800">Không Tìm Thấy Thú Cưng</h2>
+        <p className="text-xs text-slate-500 mt-2 max-w-sm">
+          {errorMessage || `Mã định danh "${petCode}" không tồn tại trên hệ thống database.`}
+        </p>
+        <Link
+          to="/"
+          className="mt-6 px-5 py-2.5 rounded-xl bg-[#0284C7] text-white text-xs font-bold hover:bg-[#0369A1] transition-colors"
+        >
+          Quay Về Trang Chủ
+        </Link>
+      </div>
+    );
+  }
+
+  const pet = petData;
+  const ownerPhone = pet.owner?.phone || '';
+  const cleanPhone = ownerPhone.replace(/[^0-9+]/g, '');
+  const zaloLink = `https://zalo.me/${cleanPhone}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#E6F7FF]/50 via-slate-50 to-slate-100 flex flex-col items-center justify-between pb-28">
